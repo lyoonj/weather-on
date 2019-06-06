@@ -283,6 +283,7 @@ int getHourIndex()
 {
       int i = 0;
       int hour_area = input_hour - (input_hour % 3);
+      if (hour_area == 0) hour_area = 24;
       while(data[i][i_hour].toInt() != hour_area)
         i++;
       return i;
