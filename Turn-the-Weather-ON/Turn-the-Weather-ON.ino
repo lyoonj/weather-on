@@ -4,16 +4,16 @@
 
 #define STRIP_LEN 12
 #define WEATHER_LEN 7
-7
+
 
 
 
 // WiFi, Server
-char ssid[] = "HYDROM-522"; // 와이파이 id
-char pass[] = "vlzja0524"; // 와이파이 pw
+char ssid[] = "HYDROM-522"; // WiFi id
+char pass[] = "vlzja0524"; // WiFi pw
 char host[] = "www.kma.go.kr";
 String url = "/wid/queryDFSRSS.jsp?zone=";
-String zone = "4127152500";
+String zone = "4127152500"; // 안산시 상록구 사동 지역코드
 WiFiServer server(80);
 WiFiClient client;
 IPAddress hostIp;
@@ -37,7 +37,7 @@ String output_pty;
 // Output -> strip이 두 칸 모자라..... 남은 80cm로는 .... 둘레... 애매한데.....sky를 아예 둘레로? 그게 나을지도
 Adafruit_NeoPixel weather_strip[WEATHER_LEN] = {Adafruit_NeoPixel(D7, STRIP_LEN, NEO_GRB + NEO_KHZ800),  // 하늘 배경
                                                 Adafruit_NeoPixel(D6, STRIP_LEN, NEO_GRB + NEO_KHZ800),  // 맑음
-                                                Adafruit_NeoPixel(D5, STRIP_LEN, NEO_GRB + NEO_KHZ800),  // 구름조금 --> 이거 일단 제외 
+                                                Adafruit_NeoPixel(D5, STRIP_LEN, NEO_GRB + NEO_KHZ800),  // 구름조금 --> LED 새로 오기 전까지 이거 일단 제외 
                                                 Adafruit_NeoPixel(D4, STRIP_LEN, NEO_GRB + NEO_KHZ800),  // 구름많이
                                                 Adafruit_NeoPixel(D3, STRIP_LEN, NEO_GRB + NEO_KHZ800),  // 흐림
                                                 Adafruit_NeoPixel(D2, STRIP_LEN, NEO_GRB + NEO_KHZ800),  // 비 - 1
@@ -89,10 +89,10 @@ void loop()  // 문제점 : server에서 data를 게속 받아오면 안된다. 
   output_pty = data[hour_index][i_pty];
 
   // Data -> Output
-  showDate();  //  ①now_date -> LCD 출력 
-  showNowHour(); // ②now_hour -> LED 출력 (한시간마다 갱신..)
-  showInputHour(); // ③input_hour -> 7 segment 출력
-  showSky(); // ④input_hour -> strip_sky 출력 (시간에 따른 하늘의 색 구현)
+  showDate();  //  !!!!! --- ① now_date -> LCD 출력 
+  showNowHour(); // !!!!! --- ② now_hour -> LED 출력 (한시간마다 갱신..)
+  showInputHour(); // !!!!! --- ③ input_hour -> 7 segment 출력
+  showSky(); // !!!!! --- ④ input_hour -> strip_sky 출력 (시간에 따른 하늘의 색 구현)
   showWeather(output_sky.toInt(), output_pty.toInt());
 
   
@@ -308,7 +308,7 @@ void colorOn(Adafruit_NeoPixel strip) {
 
 void colorOff(Adafruit_NeoPixel strip) {
   for (uint16_t i=0; i<strip.numPixels(); i++) {
-    strip.setPixelColor(i, strip.Color(255, 255, 255));
+    strip.setPixelColor(i, 0);
     strip.show();
   }
 }
@@ -325,13 +325,13 @@ void showNowHour()
     // 현재 시간부터 24시까지 LED로 켜기 -> 네오픽셀 또 사...?
 }
 
-void showInputHour()
+void showInputHour() // !!!!!!!!!!!!! -- 이거 어떻게 할지 모르겠ㅅ서여
 {
     //input_hour 사용
     // 7 segment로 input_hour 표현! -> 부탁해요(2자리 수!)
 }
 
-void showSky() // 시간에 따라 색깔 달라지기. (밤 즈음엔 필름으로 어둡게...)
+void showSky() // 시간에 따라 색깔 달라지기. (밤 즈음엔 필름으로 어둡게...) -> 나중에 바꾸기
 {
     if(input_hour == 0)
       colorWipe(sky_strip, sky_strip.Color(3, 36, 114), 0);
@@ -349,16 +349,16 @@ void showWeather(int sky, int pty)
       case 1:
         pty = 5;
         break;
-      case 2:3:
+      case 2: case 3:
         pty = 5;
         pty2 = 6;
         break;
       case 4:
         pty = 6;
         break;
-    }; // 이 코드 나중에 보수.... 심히 맘에 안 든다.
+    }; // 이 코드도 나중에 보수.... 맘에 안 든다.
     
-    for(int 0; i<WEATHER_LEN; i++)
+    for(int i = 1; i<WEATHER_LEN; i++)
       if(i==sky || i==pty || i==pty2) colorOn(i);
       else colorOff(i);
     
