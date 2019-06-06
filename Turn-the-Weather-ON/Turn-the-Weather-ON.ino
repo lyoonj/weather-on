@@ -29,7 +29,7 @@ int volume = A0;
 int volume_input;
 int now_hour = -1;
 String input_date = "";
-int input_hour = -1;
+volatile int input_hour = -1; // volatile int로 선언하는게 맞나..? 설명 예제에선 LOW라서 byte를 사용하는데.. 여기도 byte를 사용해야하나?
 int hour_index;
 String output_sky;
 String output_pty;
@@ -68,6 +68,7 @@ void setup()
       weather_strip[i].begin();
       weather_strip[i].show();
     }
+    attachInterrupt(digitalPinToInterrupt(volume), getHourInput, CHANGE);
 
     // WiFi & Server setting
     connectToWiFi();
@@ -75,7 +76,7 @@ void setup()
 }
 
 
-void loop()  // 문제점 : server에서 data를 게속 받아오면 안된다. 딜레이를 넣어야 한다. 근데 volume input에는 즉각 반응해야한다. delay를 하면서 volume 인풋에만 귀 기울이는 방법?
+void loop()  // 문제점 : server에서 data를 게속 받아오면 안된다. 딜레이를 넣어야 한다. 근데 volume input에는 즉각 반응해야한다. delay를 하면서 volume 인풋에만 귀 기울이는 방법? -> interreupt를 사용해보자!
 {
   // Server -> Data
   parseWeatherData();
