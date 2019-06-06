@@ -29,7 +29,7 @@ int volume = A0;
 int volume_input;
 int now_hour = -1;
 String input_date = "";
-volatile int input_hour = -1; // volatile int로 선언하는게 맞나..? 설명 예제에선 LOW라서 byte를 사용하는데.. 여기도 byte를 사용해야하나?
+volatile byte input_hour = -1; // 설명 예제에선 LOW라서 byte를 사용하는데.. 여기도 byte를 사용해야하나?
 int hour_index;
 String output_sky;
 String output_pty;
@@ -92,7 +92,7 @@ void loop()  // 문제점 : server에서 data를 게속 받아오면 안된다. 
   // Data -> Output
   showDate();  //  !!!!! --- ① now_date -> LCD 출력 
   showNowHour(); // !!!!! --- ② now_hour -> LED 출력 (한시간마다 갱신..)
-  showInputHour(); // !!!!! --- ③ input_hour -> 7 segment 출력
+  showInput(); // !!!!! --- ③ input_hour -> 7 segment 출력
   showSky(); // !!!!! --- ④ input_hour -> strip_sky 출력 (시간에 따른 하늘의 색 구현)
   showWeather(output_sky.toInt(), output_pty.toInt());
 
@@ -314,22 +314,16 @@ void colorOff(Adafruit_NeoPixel strip) {
   }
 }
 
-void showDate()
+void showInput() --> lcd 모니터 구매!
 {
-    // input_date 사용
-    // 7 segment나 LCD 모니터로 날짜 표현... 아마 LCD 모니터...
+    // input_date, input_hour 사용
+    // LCD 모니터로 입력된 날짜와 시간 표현
 }
 
 void showNowHour()
 {
      // now_hour 사용
     // 현재 시간부터 24시까지 LED로 켜기 -> 네오픽셀 또 사...?
-}
-
-void showInputHour() // !!!!!!!!!!!!! -- 이거 어떻게 할지 모르겠ㅅ서여
-{
-    //input_hour 사용
-    // 7 segment로 input_hour 표현! -> 부탁해요(2자리 수!)
 }
 
 void showSky() // 시간에 따라 색깔 달라지기. (밤 즈음엔 필름으로 어둡게...) -> 나중에 바꾸기
