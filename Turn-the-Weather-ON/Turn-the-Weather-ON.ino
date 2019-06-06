@@ -1,8 +1,8 @@
-//#include "SPI.h"
+#include "SPI.h"
 #include <ESP8266WiFi.h>
 
-char ssid[] = "HYDORM-522";       //와이파이 SSID
-char pass[] = "vlzja0524";   //와이파이 password 
+char ssid[] = "Tenda_F4A430 2";       //와이파이 SSID
+char pass[] = "73843719";   //와이파이 password 
 const char* host = "www.kma.go.kr";
 
 
@@ -15,6 +15,7 @@ IPAddress hostIp;
 uint8_t ret;
 
 int temp = 0;
+
 
 String weather_str="";
 String wt_temp="";
@@ -29,7 +30,13 @@ int getInt(String);
 void printHex(int, int);
 // -----------------------
 
+int volume = A0;
+int val;
+
 void setup() {
+
+  pinMode(volume, INPUT);
+    
   //각 변수에 정해진 공간 할당
   Serial.begin(115200);    
   delay(10);
@@ -38,8 +45,8 @@ void setup() {
   WiFi.begin(ssid, pass);  //WiFi가 패스워드를 사용한다면 매개변수에 password도 작성
   //*--기다리기
   while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
+    //delay(500);
+    //Serial.print(".");
   }
   //*--연결됐으면 ㄱㄱ
   Serial.println("");
@@ -52,14 +59,16 @@ void setup() {
   Serial.println("Waiting for DHCP address");
   //DHCP주소를 기다린다
   while(WiFi.localIP() == INADDR_NONE) {
-    Serial.print(".");
-    delay(300);
+    //Serial.print(".");
+    //delay(300);
   }
 //  Serial.println("DHCP success?"); // 컴파일용
   Serial.println("\n");
   printWifiData();
   connectToServer();
 //  Serial.println("--- in setup : " + client.connected());
+
+  
 }
 
 void loop() {
@@ -69,7 +78,7 @@ void loop() {
     while (client.available()) {
       //라인을 기준으로 문자열을 저장한다.
       String line = client.readStringUntil('\n');
-      Serial.println("" + line);
+//      Serial.println("" + line);
 
       
       //시간
@@ -109,6 +118,23 @@ void loop() {
       }
      }   
   }
+
+  val = analogRead(volume);
+  
+  if (val>=768){
+    Serial.println("4");
+  }
+  else if (val>=513){
+    Serial.println("3");
+  }
+  else if (val>=258){
+    Serial.println("2");
+  }
+  else if (val>=0){
+    Serial.println("1");
+  }
+  delay(500);
+  
 }
 
 //서버와 연결
@@ -224,3 +250,18 @@ int getInt(String input){
   //Serial.println(temp);
   return temp;
 }
+
+
+/*
+ * 
+ * by 서희
+ * 지난번 가변저항을 통해 4분할 한 것을 hour에 연결해서 값을 가져오는 if문을 구현하려고 했다. 
+ * 그래서 가변저항 4분할 소스코드를 기본적으로 짠 뼈대코드에 맞췄고 시간값을 불러오기 위한 식을 세워봤다. 
+ * 아직까지는 에러가 발생해서 실행이 가능한 식까지만 적어놓았다. 
+ * 
+ * 다음주가 되기 전까지 에러없이 시간값이 나올 수 있도록 더 개발하는 방향으로 수정해야 할 것 같다. 
+ * 기본적으로 wifi에 연결해서 실행하는 식이다보니 아무래도 첫 시작부터 연결이 안되거나 다른 날씨 및 정보가 바로 실행되지 않는 경우가 많다. 
+ * 확실하게 어떤 부분이 문제가 되는지도 알아야 앞으로의 개발과 수정 및 피드백이 효율적일 것이다.  
+ * 
+ * 
+  */
