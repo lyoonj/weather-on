@@ -2,8 +2,9 @@
 #include <TimeLib.h>
 #include <Adafruit_NeoPixel.h>
 
-#define STRIP_LEN 8
+#define STRIP_LEN 12
 #define WEATHER_LEN 7
+7
 
 
 
@@ -19,9 +20,9 @@ IPAddress hostIp;
 
 // Weather Data
 int i_hour = 0, i_sky = 1, i_pty = 2, i_temp = 3, i_reh = 4;
-String tags[6][2] = {{"<hour>","</hour>"}, {"<sky>","</sky>"}, {"<pty>","</pty>"}, {"<temp>", "</temp>"}, {"<reh>", "</reh>"}};
-String data[8][6] = {{"", "", "", "", "", ""}, {"", "", "", "", "", ""}, {"", "", "", "", "", ""}, {"", "", "", "", "", ""},
-                     {"", "", "", "", "", ""}, {"", "", "", "", "", ""}, {"", "", "", "", "", ""}, {"", "", "", "", "", ""}};
+String tags[5][2] = {{"<hour>","</hour>"}, {"<sky>","</sky>"}, {"<pty>","</pty>"}, {"<temp>", "</temp>"}, {"<reh>", "</reh>"}};
+String data[8][5] = {{"", "", "", "", ""}, {"", "", "", "", ""}, {"", "", "", "", ""}, {"", "", "", "", ""},
+                     {"", "", "", "", ""}, {"", "", "", "", ""}, {"", "", "", "", ""}, {"", "", "", "", ""}};
 
 // Input
 int volume = A0;
@@ -33,10 +34,10 @@ int hour_index;
 String output_sky;
 String output_pty;
 
-// Output
+// Output -> strip이 두 칸 모자라..... 남은 80cm로는 .... 둘레... 애매한데.....sky를 아예 둘레로? 그게 나을지도
 Adafruit_NeoPixel weather_strip[WEATHER_LEN] = {Adafruit_NeoPixel(D7, STRIP_LEN, NEO_GRB + NEO_KHZ800),  // 하늘 배경
                                                 Adafruit_NeoPixel(D6, STRIP_LEN, NEO_GRB + NEO_KHZ800),  // 맑음
-                                                Adafruit_NeoPixel(D5, STRIP_LEN, NEO_GRB + NEO_KHZ800),  // 구름조금
+                                                Adafruit_NeoPixel(D5, STRIP_LEN, NEO_GRB + NEO_KHZ800),  // 구름조금 --> 이거 일단 제외 
                                                 Adafruit_NeoPixel(D4, STRIP_LEN, NEO_GRB + NEO_KHZ800),  // 구름많이
                                                 Adafruit_NeoPixel(D3, STRIP_LEN, NEO_GRB + NEO_KHZ800),  // 흐림
                                                 Adafruit_NeoPixel(D2, STRIP_LEN, NEO_GRB + NEO_KHZ800),  // 비 - 1
@@ -83,20 +84,19 @@ void loop()  // 문제점 : server에서 data를 게속 받아오면 안된다. 
   // Input -> Data
   volume_input = analogRead(volume);
   input_hour = getHourInput();
-  hour_index = getHourIndex(); // 이 코드도 맡길 수 있음 맡기고.. -> 이거는 내가 해야할 듯... 내일 이거 구현하고 / 도면 그리고 / 보고서 작성 및 추후 계획
+  hour_index = getHourIndex();
   output_sky = data[hour_index][i_sky];
   output_pty = data[hour_index][i_pty];
-  // 온도 습도는 나중에 여유 되면...
 
   // Data -> Output
-  showDate();  // 아마 LCD로 출력 -> 이 코드 누구한테 맡겨야지
-  showNowHour(); // now_hour -> 한시간마다 갱신..
-  showInputHour(); // input_hour - 7 segment에 hour 출력 -> 이 코드 누구한테 맡겨야지
-  showSky(); // input_hour -
+  showDate();  //  ①now_date -> LCD 출력 
+  showNowHour(); // ②now_hour -> LED 출력 (한시간마다 갱신..)
+  showInputHour(); // ③input_hour -> 7 segment 출력
+  showSky(); // ④input_hour -> strip_sky 출력 (시간에 따른 하늘의 색 구현)
   showWeather(output_sky.toInt(), output_pty.toInt());
 
   
-  delay(10000); // 10분 단위로 갱신
+  delay(10000); // 일단 10분 단위로 갱신
 }
 
 
@@ -170,7 +170,7 @@ void parseWeatherData()
     int head, tail;
     
     for(int i=0; i<8; i++)
-      for(int j=0; j<4; j++)
+      for(int j=0; j<5; j++)
       {
           head = line.indexOf(tags[j][0]) + tags[j][0].length();
           tail = line.indexOf(tags[j][1]);
@@ -182,7 +182,7 @@ void parseWeatherData()
   }
 } 
 
-void checkWeatherData() // 컴파일용. 이후 지우기.
+void checkWeatherData() // 컴파일용. 이후 지우기.  ----- 얘네들은 서버 연결되는지 확인되면... + LED Strip 정상작동 확인 되면... 그 때 지우지..
 {
     for(int i=0; i<16; i++)
     {
@@ -199,8 +199,8 @@ void checkWeatherData() // 컴파일용. 이후 지우기.
 
 
 
-// Input -- 이 부분만 다듬자..,.
-int getHourInput() // 이건 직접 돌려보면서 다듬어야함. 등분은 되어있으니까 배치에 따라서 몇시부터 시작할지 봐야해...
+// Input
+int getHourInput()
 {
       int input_hour = 6;
       if (volume_input>=925){    
@@ -278,11 +278,11 @@ int getHourInput() // 이건 직접 돌려보면서 다듬어야함. 등분은 �
       return input_hour;
 }
 
-int getHourIndex() // 제일 까다롭다....... 이것만 완성하면 이제 Sky 부분만 대충 손볼 수 있고 그럼 난 잘 거야... -> 다음날 완성! 그래 그때 정신머리로 이거 못했어.. 아주 짧은.. 코드지만.....
+int getHourIndex()
 {
       int i = 0;
-      int hour_area = input_hour - (input_hour % 3); // 입력 시간을 9, 12, 15 등의 3배수 시간대로 환원
-      while(data[i][i_hour].toInt() != hour_area)    // 이후.. 시뮬레이션 방식이 아니라 연산식으로 코드 수정할 것....,
+      int hour_area = input_hour - (input_hour % 3);
+      while(data[i][i_hour].toInt() != hour_area)
         i++;
       return i;
 }
@@ -306,18 +306,28 @@ void colorOn(Adafruit_NeoPixel strip) {
   }
 }
 
+void colorOff(Adafruit_NeoPixel strip) {
+  for (uint16_t i=0; i<strip.numPixels(); i++) {
+    strip.setPixelColor(i, strip.Color(255, 255, 255));
+    strip.show();
+  }
+}
+
 void showDate()
 {
-    // 7 segment나 LCD 모니터로 날짜 표현... 아마 LCD 모니터...  -> 부탁해요
+    // input_date 사용
+    // 7 segment나 LCD 모니터로 날짜 표현... 아마 LCD 모니터...
 }
 
 void showNowHour()
 {
-    // 현재 시간부터 24시까지 LED로 켜기 -> 근데 이걸 오늘 날짜라고 생각을 할까 사람들이..? 안돼 그런 거 지금 생각하면 망해
+     // now_hour 사용
+    // 현재 시간부터 24시까지 LED로 켜기 -> 네오픽셀 또 사...?
 }
 
 void showInputHour()
 {
+    //input_hour 사용
     // 7 segment로 input_hour 표현! -> 부탁해요(2자리 수!)
 }
 
@@ -331,19 +341,25 @@ void showSky() // 시간에 따라 색깔 달라지기. (밤 즈음엔 필름으
       colorWipe(sky_strip, sky_strip.Color(0, 246, 255), 0);
 }
 
-void showWeather(int sky, int pty) // weather도 숫자로 매핑하면 코드 확 줄어드는데 -> 아니 근데 구현하기엔 좀 까다로운 거 같아.... -> 해냈음.
-{
-    colorOn(sky);
+void showWeather(int sky, int pty)
+{   
+    int pty2 = -1;
+    switch(pty)
+    {
+      case 1:
+        pty = 5;
+        break;
+      case 2:3:
+        pty = 5;
+        pty2 = 6;
+        break;
+      case 4:
+        pty = 6;
+        break;
+    }; // 이 코드 나중에 보수.... 심히 맘에 안 든다.
     
-    int rainy=5, snowy=6;
-    if (pty == 0)
-      return ;
-    else if (pty == 1) //비
-      colorOn(rainy);
-    else if (pty == 4) //눈
-      colorOn(snowy);
-    else{
-      colorOn(rainy);
-      colorOn(snowy); // 나중에 밝기 차이 두기? 회색이랑 흰색으로.... 그때는 switch문으로 ㄱㄱ.
-    }
+    for(int 0; i<WEATHER_LEN; i++)
+      if(i==sky || i==pty || i==pty2) colorOn(i);
+      else colorOff(i);
+    
 }
