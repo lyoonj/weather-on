@@ -4,9 +4,6 @@
 #define STRIP_LEN 12
 #define WEATHER_LEN 7
 
-
-
-
 // WiFi, Server
 char ssid[] = "HYDORM-522"; // WiFi id
 char pass[] = "vlzja0524"; // WiFi pw
@@ -18,6 +15,7 @@ WiFiClient client;
 IPAddress hostIp;
 
 // Weather Data
+String datetime = "";
 int i_hour = 0, i_temp = 1, i_sky = 2, i_pty = 3, i_reh = 4;
 String tags[5][2] = {{"<hour>","</hour>"}, {"<temp>", "</temp>"}, {"<sky>","</sky>"}, {"<pty>","</pty>"}, {"<reh>", "</reh>"}};
 String data[8][5] = {{"", "", "", "", ""}, {"", "", "", "", ""}, {"", "", "", "", ""}, {"", "", "", "", ""},
@@ -43,6 +41,14 @@ Adafruit_NeoPixel weather_strip[WEATHER_LEN] = {Adafruit_NeoPixel(D7, STRIP_LEN,
                                                 Adafruit_NeoPixel(D2, STRIP_LEN, NEO_GRB + NEO_KHZ800),  // 5 비 - 1
                                                 Adafruit_NeoPixel(D1, STRIP_LEN, NEO_GRB + NEO_KHZ800)}; // 6 눈 - 4
 Adafruit_NeoPixel sky_strip = weather_strip[0];                                               
+
+
+
+
+
+
+
+
 
 
 
@@ -91,15 +97,21 @@ void loop()  // 문제점 : server에서 data를 게속 받아오면 안된다. 
 //  output_pty = data[hour_index][i_pty];
 //
 //  // Data -> Output
-//  showDate();  //  !!!!! --- ① now_date -> LCD 출력 
+//  showInput(); // !!!!! --- ③ input_hour -> LCD 출력 
 //  showNowHour(); // !!!!! --- ② now_hour -> LED 출력 (한시간마다 갱신..)
-//  showInput(); // !!!!! --- ③ input_hour -> 7 segment 출력
 //  showSky(); // !!!!! --- ④ input_hour -> strip_sky 출력 (시간에 따른 하늘의 색 구현)
 //  showWeather(output_sky.toInt(), output_pty.toInt());
 //
 //  
   delay(1000000000); // 일단 10분 단위로 갱신
 }
+
+
+
+
+
+
+
 
 
 
@@ -165,40 +177,36 @@ void connectToServer()
 
 
 
+
+
 // Data
 void parseWeatherData()
 {
+  // Serial.println("--now parsing weather data");
   int index_now =0;
   int index_count = 0;
-  Serial.print("--now parsing weather data");
   if (client.connected())
   {
     Serial.print(".");
-    while(index_now<8){
-    if(client.available())
+    while(index_now<8)
     {
-      String line = client.readStringUntil('\n');
-      //Serial.println("" + line + "\n");
-
-
-
-          
-        for(int j=0; j<5; j++)
-        {
-            tail = line.indexOf(tags[j][1]);
-            if(tail>0)
-            {            
-                head = line.indexOf(tags[j][0]) + tags[j][0].length();
-                data[index_now][j] = line.substring(head, tail);
-                if(index_count < 5) index_count++;
-                else {
-                    index_count = 0;
-                    index_now++;
-                  }
-                Serial.println("\n---- " + line.substring(head, tail) + " is in data [" + String(j) + "][" + String(index_now) + "]\n"); // 컴파일용. 이후 지우기
-            }    
-        }
-    }
+      index_count = 0;
+      if(client.available())
+      {
+        String line = client.readStringUntil('\n');
+        //Serial.println("" + line + "\n");
+          for(int index_count=0; index_count<5; index_count++)
+          {
+              tail = line.indexOf(tags[index_count][1]);
+              if(tail>0)
+              {            
+                  head = line.indexOf(tags[index_count][0]) + tags[index_count][0].length();
+                  data[index_now][index_count] = line.substring(head, tail);
+                  //Serial.println("\n---- " + line.substring(head, tail) + " is in data [" + String(index_count) + "][" + String(index_now) + "]\n"); // 컴파일용. 이후 지우기
+              }    
+          }
+      }
+      index_now++;
   }
 }
 }
@@ -215,6 +223,8 @@ void checkWeatherData() // 컴파일용.
       Serial.println("");
     }
 }
+
+
 
 
 
@@ -311,6 +321,7 @@ int getHourIndex()
 
 
 
+
 // Output
 void colorWipe(Adafruit_NeoPixel strip, uint32_t c, uint8_t wait) {
   for (uint16_t i=0; i<strip.numPixels(); i++) {
@@ -334,7 +345,19 @@ void colorOff(Adafruit_NeoPixel strip) {
   }
 }
 
-void showSky() // 시간에 따라 색깔 달라지기. (밤 즈음엔 필름으로 어둡게...) -> 나중에 바꾸기
+
+
+showInput() // 서희
+{
+  
+}
+
+showNowHour() // 윤지?
+{
+  
+}
+
+void showSky() // 윤지 . 시간에 따라 색깔 달라지기. (밤 즈음엔 필름으로 어둡게...) -> 나중에 바꾸기
 {
     if(input_hour == 0)
       colorWipe(sky_strip, sky_strip.Color(3, 36, 114), 0);
@@ -344,15 +367,15 @@ void showSky() // 시간에 따라 색깔 달라지기. (밤 즈음엔 필름으
       colorWipe(sky_strip, sky_strip.Color(0, 246, 255), 0);
 }
 
-void showWeather(int sky, int pty)
+void showWeather(int sky, int pty)  // 이소희
 {   
-    // 스카이
+    // sky
     // 맑음 : 맑음
     // 구름 조금 : 맑음, 구름 조금
     // 구름 많음 : 맑음, 구름 조금, 구름 많음
     // 흐림 : 구름 조금, 구름 많음, 흐림
 
-    // 피티와이
+    // pty
     // 비, 눈은 따로!
     
     int pty2 = -1;
@@ -368,7 +391,7 @@ void showWeather(int sky, int pty)
       case 4:
         pty = 6;
         break;
-    }; // 이 코드도 나중에 보수.... 맘에 안 든다.
+    };
     
     for(int i = 1; i<WEATHER_LEN; i++)
       if(i==sky || i==pty || i==pty2) colorOn(i);
