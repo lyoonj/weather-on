@@ -1,6 +1,7 @@
 #include <ESP8266WiFi.h>
 #include <Adafruit_NeoPixel.h>
 
+#define DATA_LEN 6
 #define STRIP_LEN 12
 #define WEATHER_LEN 7
 
@@ -16,17 +17,16 @@ IPAddress hostIp;
 
 // Weather Data
 String datetime = "";
-int i_hour = 0, i_temp = 1, i_sky = 2, i_pty = 3, i_reh = 4;
-String tags[5][2] = {{"<hour>","</hour>"}, {"<temp>", "</temp>"}, {"<sky>","</sky>"}, {"<pty>","</pty>"}, {"<reh>", "</reh>"}};
-String data[8][5] = {{"", "", "", "", ""}, {"", "", "", "", ""}, {"", "", "", "", ""}, {"", "", "", "", ""},
-                     {"", "", "", "", ""}, {"", "", "", "", ""}, {"", "", "", "", ""}, {"", "", "", "", ""}};
+int i_hour = 0, i_day = 1, i_temp = 2, i_sky = 3, i_pty = 4, i_reh = 5;
+String tags[DATA_LEN][2] = {{"<hour>","</hour>"}, {"<day>","</day>"}, {"<temp>", "</temp>"}, {"<sky>","</sky>"}, {"<pty>","</pty>"}, {"<reh>", "</reh>"}};
+String data[8][DATA_LEN] = {{"", "", "", "", ""}, {"", "", "", "", ""}, {"", "", "", "", ""}, {"", "", "", "", ""},
+                            {"", "", "", "", ""}, {"", "", "", "", ""}, {"", "", "", "", ""}, {"", "", "", "", ""}};
 int head, tail;
 
 // Input
 int volume = A0;
 int volume_input;
-int now_hour = -1;
-String input_date = "";
+String input_date = ""; 
 volatile byte input_hour = -1; // 설명 예제에선 LOW라서 byte를 사용하는데.. 여기도 byte를 사용해야하나?
 int hour_index;
 String output_sky;
@@ -40,8 +40,8 @@ Adafruit_NeoPixel weather_strip[WEATHER_LEN] = {Adafruit_NeoPixel(D7, STRIP_LEN,
                                                 Adafruit_NeoPixel(D3, STRIP_LEN, NEO_GRB + NEO_KHZ800),  // 4 흐림
                                                 Adafruit_NeoPixel(D2, STRIP_LEN, NEO_GRB + NEO_KHZ800),  // 5 비 - 1
                                                 Adafruit_NeoPixel(D1, STRIP_LEN, NEO_GRB + NEO_KHZ800)}; // 6 눈 - 4
-Adafruit_NeoPixel sky_strip = weather_strip[0];                                               
-
+Adafruit_NeoPixel sky_strip = weather_strip[0];                           
+int clock_strip[8] = {6, 9, 12, 15, 18, 21, 24, 3};
 
 
 
@@ -86,8 +86,8 @@ void loop()  // 문제점 : server에서 data를 게속 받아오면 안된다. 
 {
   // Server -> Data
   if(client.available()){
-  parseWeatherData();
-  checkWeatherData();
+    parseWeatherData();
+    checkWeatherData();
   }
 //  // Input -> Data
 //  volume_input = analogRead(volume);
@@ -97,8 +97,8 @@ void loop()  // 문제점 : server에서 data를 게속 받아오면 안된다. 
 //  output_pty = data[hour_index][i_pty];
 //
 //  // Data -> Output
-//  showInput(); // !!!!! --- ③ input_hour -> LCD 출력 
-//  showNowHour(); // !!!!! --- ② now_hour -> LED 출력 (한시간마다 갱신..)
+  showInput(); // !!!!! --- ③ input_hour -> LCD 출력 
+  showTodayHour(); // !!!!! --- ② now_hour -> LED 출력
 //  showSky(); // !!!!! --- ④ input_hour -> strip_sky 출력 (시간에 따른 하늘의 색 구현)
 //  showWeather(output_sky.toInt(), output_pty.toInt());
 //
@@ -128,7 +128,7 @@ void loop()  // 문제점 : server에서 data를 게속 받아오면 안된다. 
 // Wifi & Server
 void connectToWiFi()
 {
-    Serial.println("Connecting to WiFi...");
+    Serial.println("\nConnecting to WiFi...");
     WiFi.begin(ssid, pass);
     while(WiFi.status() != WL_CONNECTED)
     {
@@ -182,33 +182,41 @@ void connectToServer()
 // Data
 void parseWeatherData()
 {
-  // Serial.println("--now parsing weather data");
+   Serial.println("--now parsing weather data");
   int index_now =0;
   int index_count = 0;
   if (client.connected())
   {
     Serial.print(".");
-    while(index_now<8)
+    while(index_now<8) // 이쪽은 횟수가 아닌 특정 조건으로 반복해야 함!!
     {
       index_count = 0;
       if(client.available())
       {
+        // get line
         String line = client.readStringUntil('\n');
-        //Serial.println("" + line + "\n");
-          for(int index_count=0; index_count<5; index_count++)
-          {
-              tail = line.indexOf(tags[index_count][1]);
-              if(tail>0)
-              {            
-                  head = line.indexOf(tags[index_count][0]) + tags[index_count][0].length();
-                  data[index_now][index_count] = line.substring(head, tail);
-                  //Serial.println("\n---- " + line.substring(head, tail) + " is in data [" + String(index_count) + "][" + String(index_now) + "]\n"); // 컴파일용. 이후 지우기
-              }    
-          }
-      }
-      index_now++;
+        Serial.println("" + line + "\n");
+
+        // get datetime
+        if (line.indexOf("</tm>")>0)
+          datetime = line.substring(line.indexOf("<tm>")+4, line.indexOf("</tm>"));
+ 
+        // get weather info by hour
+        for(int index_count=0; index_count<DATA_LEN; index_count++) // 이쪽은 횟수 제한으로 반복.
+        {
+           tail = line.indexOf(tags[index_count][1]);
+           if(tail>0)
+           {            
+              head = line.indexOf(tags[index_count][0]) + tags[index_count][0].length();
+              data[index_now][index_count] = line.substring(head, tail);
+              Serial.println("\n---- " + line.substring(head, tail) + " is in data [" + String(index_count) + "][" + String(index_now) + "]\n"); // 확인용
+              if (index_count==DATA_LEN-1) // 여기다.. 이 조건 안에서 플러스를 해줘야지..
+                index_now++;
+           }
+        }
+       }
+     }
   }
-}
 }
 void checkWeatherData() // 컴파일용. 
 {
@@ -216,6 +224,7 @@ void checkWeatherData() // 컴파일용.
     {
       Serial.println("");
       Serial.println("hour is " + data[i][i_hour]);
+      Serial.println("day is " + data[i][i_day]);
       Serial.println("temp is " + data[i][i_temp]);
       Serial.println("sky is " + data[i][i_sky]);
       Serial.println("pty is " + data[i][i_pty]);
@@ -308,11 +317,10 @@ int getHourInput()
       return input_hour;
 }
 
-int getHourIndex()
+int getHourIndex() // 18 : (15 ~ 18을 의미. 즉, 16이면 18에 들어가야 함.)
 {
       int i = 0;
-      int hour_area = input_hour - (input_hour % 3);
-      if (hour_area == 0) hour_area = 24;
+      int hour_area = input_hour - (input_hour % 3) + 3;
       while(data[i][i_hour].toInt() != hour_area)
         i++;
       return i;
@@ -347,17 +355,24 @@ void colorOff(Adafruit_NeoPixel strip) {
 
 
 
-showInput() // 서희
+void showInput() // 천서희
 {
-  
+  Serial.println("\n\n--- datetime is "+ datetime);
 }
 
-showNowHour() // 윤지?
+void showTodayHour() // DONE [이윤지 : 회로 작업이 까다로울 듯!!!!!]
 {
-  
+  for(int i=0; i<8; i++)
+  {
+    if((data[0][i_hour].toInt()-6)/3 <= i <= 6)
+      digitalWrite(clock_strip[i], HIGH);
+    else
+      digitalWrite(clock_strip[i], LOW);
+  }
+  Serial.println("--- now_hour is " + data[0][i_hour] + " ~ 24");
 }
 
-void showSky() // 윤지 . 시간에 따라 색깔 달라지기. (밤 즈음엔 필름으로 어둡게...) -> 나중에 바꾸기
+void showSky() // 이윤지! . 시간에 따라 색깔 달라지기. (밤 즈음엔 필름으로 어둡게...) -> 나중에 바꾸기
 {
     if(input_hour == 0)
       colorWipe(sky_strip, sky_strip.Color(3, 36, 114), 0);
@@ -394,7 +409,7 @@ void showWeather(int sky, int pty)  // 이소희
     };
     
     for(int i = 1; i<WEATHER_LEN; i++)
-      if(i==sky || i==pty || i==pty2) colorOn(i);
-      else colorOff(i);
+      if(i==sky || i==pty || i==pty2) colorOn(weather_strip[i]);
+      else colorOff(weather_strip[i]);
     
 }
