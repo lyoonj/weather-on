@@ -1,5 +1,4 @@
 #include <ESP8266WiFi.h>
-#include <TimeLib.h>
 #include <Adafruit_NeoPixel.h>
 
 #define STRIP_LEN 12
@@ -9,7 +8,7 @@
 
 
 // WiFi, Server
-char ssid[] = "HYDROM-522"; // WiFi id
+char ssid[] = "HYDORM-522"; // WiFi id
 char pass[] = "vlzja0524"; // WiFi pw
 char host[] = "www.kma.go.kr";
 String url = "/wid/queryDFSRSS.jsp?zone=";
@@ -19,10 +18,11 @@ WiFiClient client;
 IPAddress hostIp;
 
 // Weather Data
-int i_hour = 0, i_sky = 1, i_pty = 2, i_temp = 3, i_reh = 4;
-String tags[5][2] = {{"<hour>","</hour>"}, {"<sky>","</sky>"}, {"<pty>","</pty>"}, {"<temp>", "</temp>"}, {"<reh>", "</reh>"}};
+int i_hour = 0, i_temp = 1, i_sky = 2, i_pty = 3, i_reh = 4;
+String tags[5][2] = {{"<hour>","</hour>"}, {"<temp>", "</temp>"}, {"<sky>","</sky>"}, {"<pty>","</pty>"}, {"<reh>", "</reh>"}};
 String data[8][5] = {{"", "", "", "", ""}, {"", "", "", "", ""}, {"", "", "", "", ""}, {"", "", "", "", ""},
                      {"", "", "", "", ""}, {"", "", "", "", ""}, {"", "", "", "", ""}, {"", "", "", "", ""}};
+int head, tail;
 
 // Input
 int volume = A0;
@@ -36,12 +36,12 @@ String output_pty;
 
 // Output -> strip이 두 칸 모자라..... 남은 80cm로는 .... 둘레... 애매한데.....sky를 아예 둘레로? 그게 나을지도
 Adafruit_NeoPixel weather_strip[WEATHER_LEN] = {Adafruit_NeoPixel(D7, STRIP_LEN, NEO_GRB + NEO_KHZ800),  // 하늘 배경
-                                                Adafruit_NeoPixel(D6, STRIP_LEN, NEO_GRB + NEO_KHZ800),  // 맑음
-                                                Adafruit_NeoPixel(D5, STRIP_LEN, NEO_GRB + NEO_KHZ800),  // 구름조금 --> LED 새로 오기 전까지 이거 일단 제외 
-                                                Adafruit_NeoPixel(D4, STRIP_LEN, NEO_GRB + NEO_KHZ800),  // 구름많이
-                                                Adafruit_NeoPixel(D3, STRIP_LEN, NEO_GRB + NEO_KHZ800),  // 흐림
-                                                Adafruit_NeoPixel(D2, STRIP_LEN, NEO_GRB + NEO_KHZ800),  // 비 - 1
-                                                Adafruit_NeoPixel(D1, STRIP_LEN, NEO_GRB + NEO_KHZ800)}; // 눈 - 4
+                                                Adafruit_NeoPixel(D6, STRIP_LEN, NEO_GRB + NEO_KHZ800),  // 1 맑음
+                                                Adafruit_NeoPixel(D5, STRIP_LEN, NEO_GRB + NEO_KHZ800),  // 2 구름조금 --> LED 새로 오기 전까지 이거 일단 제외 
+                                                Adafruit_NeoPixel(D4, STRIP_LEN, NEO_GRB + NEO_KHZ800),  // 3 구름많이
+                                                Adafruit_NeoPixel(D3, STRIP_LEN, NEO_GRB + NEO_KHZ800),  // 4 흐림
+                                                Adafruit_NeoPixel(D2, STRIP_LEN, NEO_GRB + NEO_KHZ800),  // 5 비 - 1
+                                                Adafruit_NeoPixel(D1, STRIP_LEN, NEO_GRB + NEO_KHZ800)}; // 6 눈 - 4
 Adafruit_NeoPixel sky_strip = weather_strip[0];                                               
 
 
@@ -60,15 +60,15 @@ void setup()
     Serial.begin(115200);
     
     // Input setting
-    pinMode(volume, INPUT);
+    //pinMode(volume, INPUT);
     // Output setting
-    sky_strip.begin();
-    sky_strip.show();
-    for(int i=0; i<WEATHER_LEN; i++){
-      weather_strip[i].begin();
-      weather_strip[i].show();
-    }
-    attachInterrupt(digitalPinToInterrupt(volume), getHourInput, CHANGE);
+    //sky_strip.begin();
+    //sky_strip.show();
+//    for(int i=0; i<WEATHER_LEN; i++){
+//      weather_strip[i].begin();
+//      weather_strip[i].show();
+//    }
+//    attachInterrupt(digitalPinToInterrupt(volume), getHourInput, CHANGE);
 
     // WiFi & Server setting
     connectToWiFi();
@@ -79,27 +79,27 @@ void setup()
 void loop()  // 문제점 : server에서 data를 게속 받아오면 안된다. 딜레이를 넣어야 한다. 근데 volume input에는 즉각 반응해야한다. delay를 하면서 volume 인풋에만 귀 기울이는 방법? -> interreupt를 사용해보자!
 {
   // Server -> Data
+  if(client.available()){
   parseWeatherData();
   checkWeatherData();
-  
-  // Input -> Data
-  volume_input = analogRead(volume);
-  input_hour = getHourInput();
-  hour_index = getHourIndex();
-  output_sky = data[hour_index][i_sky];
-  output_pty = data[hour_index][i_pty];
-
-  // Data -> Output
-  showDate();  //  !!!!! --- ① now_date -> LCD 출력 
-  showNowHour(); // !!!!! --- ② now_hour -> LED 출력 (한시간마다 갱신..)
-  showInput(); // !!!!! --- ③ input_hour -> 7 segment 출력
-  showSky(); // !!!!! --- ④ input_hour -> strip_sky 출력 (시간에 따른 하늘의 색 구현)
-  showWeather(output_sky.toInt(), output_pty.toInt());
-
-  
-  delay(10000); // 일단 10분 단위로 갱신
+  }
+//  // Input -> Data
+//  volume_input = analogRead(volume);
+//  input_hour = getHourInput();
+//  hour_index = getHourIndex();
+//  output_sky = data[hour_index][i_sky];
+//  output_pty = data[hour_index][i_pty];
+//
+//  // Data -> Output
+//  showDate();  //  !!!!! --- ① now_date -> LCD 출력 
+//  showNowHour(); // !!!!! --- ② now_hour -> LED 출력 (한시간마다 갱신..)
+//  showInput(); // !!!!! --- ③ input_hour -> 7 segment 출력
+//  showSky(); // !!!!! --- ④ input_hour -> strip_sky 출력 (시간에 따른 하늘의 색 구현)
+//  showWeather(output_sky.toInt(), output_pty.toInt());
+//
+//  
+  delay(1000000000); // 일단 10분 단위로 갱신
 }
-
 
 
 
@@ -130,6 +130,7 @@ void connectToWiFi()
 
 void connectToServer()
 {
+  
     server.begin();
     Serial.println("Connecting to Server...");
     Serial.println("Waiting for DHCP address...");
@@ -137,8 +138,10 @@ void connectToServer()
       Serial.print(".");
       delay(300);
     }
-    WiFi.hostByName(host, hostIp);
-    if(client.connect(hostIp, 80))  
+    Serial.println("\n");
+    WiFi.hostByName("www.kma.go.kr", hostIp);
+  
+  if(client.connect(hostIp, 80))  
     {
       Serial.println("Server Connected!");
       client.print(String("GET ") + url + zone + " HTTP/1.1\r\n" +
@@ -165,27 +168,43 @@ void connectToServer()
 // Data
 void parseWeatherData()
 {
-  if(client.available())
+  int index_now =0;
+  int index_count = 0;
+  Serial.print("--now parsing weather data");
+  if (client.connected())
   {
-    String line = client.readStringUntil('\n');  
-    int head, tail;
-    
-    for(int i=0; i<8; i++)
-      for(int j=0; j<5; j++)
-      {
-          head = line.indexOf(tags[j][0]) + tags[j][0].length();
-          tail = line.indexOf(tags[j][1]);
-          if(tail>0){
-              data[j][i] = line.substring(head, tail);
-              Serial.println("\n---- " + line.substring(head, tail) + " is in data [" + String(j) + "][" + String(i) + "]\n"); // 컴파일용. 이후 지우기
-          }    
-      }
-  }
-} 
+    Serial.print(".");
+    while(index_now<8){
+    if(client.available())
+    {
+      String line = client.readStringUntil('\n');
+      //Serial.println("" + line + "\n");
 
-void checkWeatherData() // 컴파일용. 이후 지우기.  ----- 얘네들은 서버 연결되는지 확인되면... + LED Strip 정상작동 확인 되면... 그 때 지우지..
+
+
+          
+        for(int j=0; j<5; j++)
+        {
+            tail = line.indexOf(tags[j][1]);
+            if(tail>0)
+            {            
+                head = line.indexOf(tags[j][0]) + tags[j][0].length();
+                data[index_now][j] = line.substring(head, tail);
+                if(index_count < 5) index_count++;
+                else {
+                    index_count = 0;
+                    index_now++;
+                  }
+                Serial.println("\n---- " + line.substring(head, tail) + " is in data [" + String(j) + "][" + String(index_now) + "]\n"); // 컴파일용. 이후 지우기
+            }    
+        }
+    }
+  }
+}
+}
+void checkWeatherData() // 컴파일용. 
 {
-    for(int i=0; i<16; i++)
+    for(int i=0; i<8; i++)
     {
       Serial.println("");
       Serial.println("hour is " + data[i][i_hour]);
@@ -315,18 +334,6 @@ void colorOff(Adafruit_NeoPixel strip) {
   }
 }
 
-void showInput() --> lcd 모니터 구매!
-{
-    // input_date, input_hour 사용
-    // LCD 모니터로 입력된 날짜와 시간 표현
-}
-
-void showNowHour()
-{
-     // now_hour 사용
-    // 현재 시간부터 24시까지 LED로 켜기 -> 네오픽셀 또 사...?
-}
-
 void showSky() // 시간에 따라 색깔 달라지기. (밤 즈음엔 필름으로 어둡게...) -> 나중에 바꾸기
 {
     if(input_hour == 0)
@@ -339,6 +346,15 @@ void showSky() // 시간에 따라 색깔 달라지기. (밤 즈음엔 필름으
 
 void showWeather(int sky, int pty)
 {   
+    // 스카이
+    // 맑음 : 맑음
+    // 구름 조금 : 맑음, 구름 조금
+    // 구름 많음 : 맑음, 구름 조금, 구름 많음
+    // 흐림 : 구름 조금, 구름 많음, 흐림
+
+    // 피티와이
+    // 비, 눈은 따로!
+    
     int pty2 = -1;
     switch(pty)
     {
