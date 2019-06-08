@@ -19,18 +19,18 @@ IPAddress hostIp;
 String datetime = "";
 int i_hour = 0, i_day = 1, i_temp = 2, i_sky = 3, i_pty = 4, i_reh = 5;
 String tags[DATA_LEN][2] = {{"<hour>","</hour>"}, {"<day>","</day>"}, {"<temp>", "</temp>"}, {"<sky>","</sky>"}, {"<pty>","</pty>"}, {"<reh>", "</reh>"}};
-String data[8][DATA_LEN] = {{"", "", "", "", ""}, {"", "", "", "", ""}, {"", "", "", "", ""}, {"", "", "", "", ""},
-                            {"", "", "", "", ""}, {"", "", "", "", ""}, {"", "", "", "", ""}, {"", "", "", "", ""}};
+String data[8][DATA_LEN] = {{"", "", "", "", "", ""}, {"", "", "", "", "", ""}, {"", "", "", "", "", ""}, {"", "", "", "", "", ""},
+                            {"", "", "", "", "", ""}, {"", "", "", "", "", ""}, {"", "", "", "", "", ""}, {"", "", "", "", "", ""}};
 int head, tail;
 
 // Input
 int volume = A0;
-int volume_input;
+int volume_input = 0;
 String input_date = ""; 
-volatile byte input_hour = -1; // 설명 예제에선 LOW라서 byte를 사용하는데.. 여기도 byte를 사용해야하나?
-int hour_index;
-String output_sky;
-String output_pty;
+int input_hour = -1; // 설명 예제에선 LOW라서 byte를 사용하는데.. 여기도 byte를 사용해야하나?
+int hour_index = -1;
+String output_sky = "";
+String output_pty = "";
 
 // Output -> strip이 두 칸 모자라..... 남은 80cm로는 .... 둘레... 애매한데.....sky를 아예 둘레로? 그게 나을지도
 Adafruit_NeoPixel weather_strip[WEATHER_LEN] = {Adafruit_NeoPixel(D7, STRIP_LEN, NEO_GRB + NEO_KHZ800),  // 하늘 배경
@@ -66,15 +66,14 @@ void setup()
     Serial.begin(115200);
     
     // Input setting
-    //pinMode(volume, INPUT);
+    pinMode(volume, INPUT_PULLUP);
     // Output setting
-    //sky_strip.begin();
-    //sky_strip.show();
+    sky_strip.begin();
+    sky_strip.show();
 //    for(int i=0; i<WEATHER_LEN; i++){
 //      weather_strip[i].begin();
 //      weather_strip[i].show();
 //    }
-//    attachInterrupt(digitalPinToInterrupt(volume), getHourInput, CHANGE);
 
     // WiFi & Server setting
     connectToWiFi();
@@ -84,25 +83,24 @@ void setup()
 
 void loop()  // 문제점 : server에서 data를 게속 받아오면 안된다. 딜레이를 넣어야 한다. 근데 volume input에는 즉각 반응해야한다. delay를 하면서 volume 인풋에만 귀 기울이는 방법? -> interreupt를 사용해보자!
 {
-  // Server -> Data
-  if(client.available()){
-    parseWeatherData();
-    checkWeatherData();
-  }
+  // Server -> Data   [[if data changes.. -> 특정 시간대가 되면?
+  parseWeatherData();
+
+  
 //  // Input -> Data
-//  volume_input = analogRead(volume);
-//  input_hour = getHourInput();
-//  hour_index = getHourIndex();
-//  output_sky = data[hour_index][i_sky];
-//  output_pty = data[hour_index][i_pty];
-//
-//  // Data -> Output
-  showInput(); // !!!!! --- ③ input_hour -> LCD 출력 
-  showTodayHour(); // !!!!! --- ② now_hour -> LED 출력
-//  showSky(); // !!!!! --- ④ input_hour -> strip_sky 출력 (시간에 따른 하늘의 색 구현)
-//  showWeather(output_sky.toInt(), output_pty.toInt());
-//
-//  
+  volume_input = analogRead(volume);
+  input_hour = map(volume_input, 4, 1024, 1, 24);
+  hour_index = getHourIndex();
+  output_sky = data[hour_index][i_sky];
+  output_pty = data[hour_index][i_pty];
+
+  // Data -> Output
+  showInput(); // LCD (datetime)
+//  showTodayHour(); // LED (clock)
+  showSky(); // RGB gradation
+  showWeather(output_sky.toInt(), output_pty.toInt()); // Panel on/off
+
+
   delay(1000000000); // 일단 10분 단위로 갱신
 }
 
@@ -182,148 +180,57 @@ void connectToServer()
 // Data
 void parseWeatherData()
 {
-   Serial.println("--now parsing weather data");
-  int index_now =0;
-  int index_count = 0;
-  if (client.connected())
-  {
-    Serial.print(".");
-    while(index_now<8) // 이쪽은 횟수가 아닌 특정 조건으로 반복해야 함!!
+  if(client.available()){
+//    Serial.println("\n\n--now parsing weather data\n\n");
+    int index_now =0;
+    int index_count = 0;
+    if (client.connected())
     {
-      index_count = 0;
-      if(client.available())
+      Serial.print(".");
+      while(index_now<8) // 이쪽은 횟수가 아닌 특정 조건으로 반복해야 함!!
       {
-        // get line
-        String line = client.readStringUntil('\n');
-        Serial.println("" + line + "\n");
-
-        // get datetime
-        if (line.indexOf("</tm>")>0)
-          datetime = line.substring(line.indexOf("<tm>")+4, line.indexOf("</tm>"));
- 
-        // get weather info by hour
-        for(int index_count=0; index_count<DATA_LEN; index_count++) // 이쪽은 횟수 제한으로 반복.
+        index_count = 0;
+        if(client.available())
         {
-           tail = line.indexOf(tags[index_count][1]);
-           if(tail>0)
-           {            
-              head = line.indexOf(tags[index_count][0]) + tags[index_count][0].length();
-              data[index_now][index_count] = line.substring(head, tail);
-              Serial.println("\n---- " + line.substring(head, tail) + " is in data [" + String(index_count) + "][" + String(index_now) + "]\n"); // 확인용
-              if (index_count==DATA_LEN-1) // 여기다.. 이 조건 안에서 플러스를 해줘야지..
-                index_now++;
-           }
-        }
+          // get line
+          String line = client.readStringUntil('\n');
+//          Serial.println("" + line + "\n");
+  
+          // get datetime
+          if (line.indexOf("</tm>")>0)
+            datetime = line.substring(line.indexOf("<tm>")+4, line.indexOf("</tm>"));
+   
+          // get weather info by hour
+          for(int index_count=0; index_count<DATA_LEN; index_count++) // 이쪽은 횟수 제한으로 반복.
+          {
+             tail = line.indexOf(tags[index_count][1]);
+             if(tail>0)
+             {            
+                head = line.indexOf(tags[index_count][0]) + tags[index_count][0].length();
+                data[index_now][index_count] = line.substring(head, tail);
+                if (index_count==DATA_LEN-1) // 여기다.. 이 조건 안에서 플러스를 해줘야지..
+                  index_now++;
+//                Serial.println("\n---- " + line.substring(head, tail) + " is in data [" + String(index_now) + "][" + String(index_count) + "]\n"); // 확인용
+             }
+          }
+         }
        }
-     }
+    }
   }
 }
-void checkWeatherData() // 컴파일용. 
-{
-    for(int i=0; i<8; i++)
-    {
-      Serial.println("");
-      Serial.println("hour is " + data[i][i_hour]);
-      Serial.println("day is " + data[i][i_day]);
-      Serial.println("temp is " + data[i][i_temp]);
-      Serial.println("sky is " + data[i][i_sky]);
-      Serial.println("pty is " + data[i][i_pty]);
-      Serial.println("reh is " + data[i][i_reh]);
-      Serial.println("");
-    }
-}
-
 
 
 
 
 
 // Input
-int getHourInput()
-{
-      int input_hour = 6;
-      if (volume_input>=925){    
-        input_hour = 5;
-      }
-      else if (volume_input>=883) {    
-        input_hour = 4;
-      }
-      else if (volume_input>=841){
-        input_hour = 3;
-      }
-      else if (volume_input>=799){
-        input_hour = 2;
-      }
-      else if (volume_input>=757){
-        input_hour = 1;
-      }
-      else if (volume_input>=715){
-        input_hour = 24;
-      }
-      else if (volume_input>=673){
-        input_hour = 23;
-      }
-      else if (volume_input>=631){
-        input_hour = 22;
-      }
-     else if (volume_input>=589){
-       input_hour = 21;
-      }
-      else if (volume_input>=547){
-        input_hour = 20;
-      }
-      else if (volume_input>=505){
-        input_hour = 19;
-      }
-      else if (volume_input>=463){
-        input_hour = 18;
-      }
-      else if (volume_input>=421){
-        input_hour = 17;
-      }
-      else if (volume_input>=379){
-        input_hour = 16;
-      }
-      else if (volume_input>=337){
-        input_hour = 15;
-      }
-      else if (volume_input>=295){
-        input_hour = 14;
-      }
-      else if (volume_input>=258){
-        input_hour = 13;
-      }
-      else if (volume_input>=253){
-        input_hour = 12;
-      }
-      else if (volume_input>=211){
-        input_hour = 11;
-      }
-      else if (volume_input>=169){
-        input_hour = 10;
-      }
-      else if (volume_input>=127){
-        input_hour = 9;
-      }
-      else if (volume_input>=85){
-        input_hour = 8;
-      }
-      else if (volume_input>=43){
-        input_hour = 7;
-      }
-      else if (volume_input>=0){
-        input_hour = 6;
-      }
-      return input_hour;
-}
-
 int getHourIndex() // 18 : (15 ~ 18을 의미. 즉, 16이면 18에 들어가야 함.)
 {
       int i = 0;
       int hour_area = input_hour - (input_hour % 3) + 3;
-      while(data[i][i_hour].toInt() != hour_area)
-        i++;
-      return i;
+      for(int i=0; i<8; i++)
+        if(data[i][i_hour].toInt() == hour_area) return i;
+      return -1;
 }
 
 
@@ -331,25 +238,25 @@ int getHourIndex() // 18 : (15 ~ 18을 의미. 즉, 16이면 18에 들어가야 
 
 
 // Output
-void colorWipe(Adafruit_NeoPixel strip, uint32_t c, uint8_t wait) {
-  for (uint16_t i=0; i<strip.numPixels(); i++) {
-    strip.setPixelColor(i, c);
-    strip.show();
+void colorWipe(Adafruit_NeoPixel *strip, uint32_t c, uint8_t wait) {
+  for (uint16_t i=0; i<(*strip).numPixels(); i++) {
+    (*strip).setPixelColor(i, c);
+    (*strip).show();
     delay(wait);
   }
 }
 
-void colorOn(Adafruit_NeoPixel strip) {
-  for (uint16_t i=0; i<strip.numPixels(); i++) {
-    strip.setPixelColor(i, strip.Color(255, 255, 255));
-    strip.show();
+void colorOn(Adafruit_NeoPixel *strip) {
+  for (uint16_t i=0; i<(*strip).numPixels(); i++) {
+    (*strip).setPixelColor(i, (*strip).Color(255, 255, 255));
+    (*strip).show();
   }
 }
 
-void colorOff(Adafruit_NeoPixel strip) {
-  for (uint16_t i=0; i<strip.numPixels(); i++) {
-    strip.setPixelColor(i, 0);
-    strip.show();
+void colorOff(Adafruit_NeoPixel *strip) {
+  for (uint16_t i=0; i<(*strip).numPixels(); i++) {
+    (*strip).setPixelColor(i, 0);
+    (*strip).show();
   }
 }
 
@@ -357,7 +264,13 @@ void colorOff(Adafruit_NeoPixel strip) {
 
 void showInput() // 천서희
 {
+  
+//  hour_index = getHour Index();
   Serial.println("\n\n--- datetime is "+ datetime);
+  Serial.println("--- input hour is "+ String(input_hour));
+  Serial.println("--- hour_index is "+ String(hour_index));
+//  Serial.println("--- sky is "+ data[hour_index][i_sky]);
+//  Serial.println("--- pty is "+ data[hour_index][i_sky]);
 }
 
 void showTodayHour() // DONE [이윤지 : 회로 작업이 까다로울 듯!!!!!]
@@ -374,16 +287,21 @@ void showTodayHour() // DONE [이윤지 : 회로 작업이 까다로울 듯!!!!!
 
 void showSky() // 이윤지! . 시간에 따라 색깔 달라지기. (밤 즈음엔 필름으로 어둡게...) -> 나중에 바꾸기
 {
-    if(input_hour == 0)
-      colorWipe(sky_strip, sky_strip.Color(3, 36, 114), 0);
-    else if (input_hour == 6)
-      colorWipe(sky_strip, sky_strip.Color(4, 104, 150), 0);
-    else if (input_hour == 12)
-      colorWipe(sky_strip, sky_strip.Color(0, 246, 255), 0);
+    colorOn(&sky_strip);
+
+      
+//    if(input_hour == 0)
+//      colorWipe(&sky_strip, sky_strip.Color(3, 36, 114), 0);
+//    else if (input_hour == 6)
+//      colorWipe(&sky_strip, sky_strip.Color(4, 104, 150), 0);
+//    else if (input_hour == 12)
+//      colorWipe(&sky_strip, sky_strip.Color(0, 246, 255), 0);
 }
 
 void showWeather(int sky, int pty)  // 이소희
 {   
+    Serial.println("sky is : " + String(sky));
+    Serial.println("pty is : " + String(pty));
     // sky
     // 맑음 : 맑음
     // 구름 조금 : 맑음, 구름 조금
@@ -393,23 +311,23 @@ void showWeather(int sky, int pty)  // 이소희
     // pty
     // 비, 눈은 따로!
     
-    int pty2 = -1;
-    switch(pty)
-    {
-      case 1:
-        pty = 5;
-        break;
-      case 2: case 3:
-        pty = 5;
-        pty2 = 6;
-        break;
-      case 4:
-        pty = 6;
-        break;
-    };
-    
-    for(int i = 1; i<WEATHER_LEN; i++)
-      if(i==sky || i==pty || i==pty2) colorOn(weather_strip[i]);
-      else colorOff(weather_strip[i]);
+//    int pty2 = -1;
+//    switch(pty)
+//    {
+//      case 1:
+//        pty = 5;
+//        break;
+//      case 2: case 3:
+//        pty = 5;
+//        pty2 = 6;
+//        break;
+//      case 4:
+//        pty = 6;
+//        break;
+//    };
+//    
+//    for(int i = 1; i<WEATHER_LEN; i++)
+//      if(i==sky || i==pty || i==pty2) colorOn(&weather_strip[i]);
+//      else colorOff(&weather_strip[i]);
     
 }
