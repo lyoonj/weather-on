@@ -27,7 +27,7 @@ int head, tail;
 int volume = A0;
 int volume_input = 0;
 String input_date = ""; 
-int input_hour = -1; // 설명 예제에선 LOW라서 byte를 사용하는데.. 여기도 byte를 사용해야하나?
+int input_hour = -1;
 int hour_index = -1;
 String output_sky = "";
 String output_pty = "";
