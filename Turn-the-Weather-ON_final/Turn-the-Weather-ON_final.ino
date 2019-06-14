@@ -32,8 +32,8 @@ IPAddress hostIp;
 
 // Time Data
 RTC_DS1307 RTC;
-int last_hour = -1;
 int now_hour = 0;
+int last_hour = 0;
 int now_minute = 0; // for compile
 int now_month = 0;
 int now_day = 0;
@@ -89,11 +89,7 @@ void setup() {
 
 void loop() {
   // put your main code here, to run repeatedly:
-  getTime();
-  if(now_hour == last_hour)
-    Serial.println("now time is "+ String(now_hour) + " : " + String(now_minute));
-  last_hour = now_hour;
-  delay(1000);
+
 }
 
 
