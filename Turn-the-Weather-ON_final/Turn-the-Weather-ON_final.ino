@@ -1,23 +1,22 @@
 #include <ESP8266WiFi.h>
-#include <TimeLib.h>
 #include <Adafruit_NeoPixel.h>
 #include <RTClib.h>
 
-// define time
-
 
 // define input
-
+#define clPin 0        // !!! --- pinNUM
+#define dtPin 0        // !!! --- pinNUM
+#define swPin 0        // !!! --- pinNUM
 
 // define output
 #define DATA_LEN 6
-#define WEATHER_PIN   // !!! --- pinNUM
+#define WEATHER_PIN 0  // !!! --- pinNUM
 #define WEATHER_LEN 12
 #define WEATHER_NUM 6
-#define SKY_PIN 0     // !!! --- pinNum
+#define SKY_PIN 0      // !!! --- pinNUM
 #define SKY_LEN 0
 #define CLOCK_PIN 0 
-#define CLOCK_LEN 8   // !!! --- pinNum
+#define CLOCK_LEN 8    // !!! --- pinNUM
 
 
 
@@ -46,6 +45,7 @@ int hour_index = 0;
 int input_day = 0;
 
 // Weather Data
+int tail, head;
 String datetime = "";
 int i_hour = 0, i_day = 1, i_temp = 2, i_sky = 3, i_pty = 4, i_reh = 5;
 String tags[DATA_LEN][2] = {{"<hour>","</hour>"}, {"<day>","</day>"}, {"<temp>", "</temp>"}, {"<sky>","</sky>"}, {"<pty>","</pty>"}, {"<reh>", "</reh>"}};
@@ -54,9 +54,9 @@ String data[8][DATA_LEN] = {{"", "", "", "", "", ""}, {"", "", "", "", "", ""}, 
 // Output
 int output_sky = 0;
 int output_pty = 0;
-Adafruit_NeoPixel weather_strip = Adafruit_NeoPixel(WEATHER_PIN, WEATHER_LEN * WEATHER_NUM, NEO_GRB + NEO_KHZ800);
-Adafruit_NeoPixel sky_strip = Adafruit_NeoPixel(SKY_PIN, SKY_LEN, NEO_GRB + NEO_KHZ800);
-Adafruit_NeoPixel clock_strip = Adafruit_NeoPixel(CLOCK_PIN, CLOCK_LEN, NEO_GRB + NEO_KHZ800);
+Adafruit_NeoPixel weather_strip = Adafruit_NeoPixel(WEATHER_LEN, WEATHER_PIN, NEO_GRB + NEO_KHZ800);
+Adafruit_NeoPixel sky_strip = Adafruit_NeoPixel(SKY_LEN, SKY_PIN, NEO_GRB + NEO_KHZ800);
+Adafruit_NeoPixel clock_strip = Adafruit_NeoPixel(CLOCK_LEN, CLOCK_PIN, NEO_GRB + NEO_KHZ800);
 
 
 
@@ -103,6 +103,54 @@ void loop() {
 
 
 
+// Wifi & Server
+void connectToWiFi()
+{
+    Serial.println("\nConnecting to WiFi...");
+    WiFi.begin(ssid, pass);
+    while(WiFi.status() != WL_CONNECTED)
+    {
+      delay(500);
+      Serial.print(".");  
+    }
+    Serial.println("WiFi Connected!");
+    Serial.println("IP address : ");
+    Serial.println(WiFi.localIP());
+}
+
+void connectToServer()
+{
+  
+    server.begin();
+    Serial.println("Connecting to Server...");
+    Serial.println("Waiting for DHCP address...");
+    while(WiFi.localIP() == INADDR_NONE) {
+      Serial.print(".");
+      delay(300);
+    }
+    Serial.println("\n");
+    WiFi.hostByName("www.kma.go.kr", hostIp);
+  
+  if(client.connect(hostIp, 80))  
+    {
+      Serial.println("Server Connected!");
+      client.print(String("GET ") + url + zone + " HTTP/1.1\r\n" +
+                    "Host: " + host + "\r\n" +
+                    "Connection: close\r\n\r\n");  
+
+      
+      int timeout = millis() + 5000;
+      while(client.available() == 0)
+      {
+         if(timeout - millis() < 0)
+         {
+            Serial.println(">> Client Timeout!");
+            client.stop();
+            return;
+         }  
+      }  
+    }
+}
 
 // Data
 void parseWeatherData()
