@@ -5,9 +5,9 @@
 
 
 // define input
-#define clPin 2        // !!! --- pinNUM
-#define dtPin 3        // !!! --- pinNUM
-#define swPin 4        // !!! --- pinNUM
+#define clPin D2        // !!! --- pinNUM
+#define dtPin D3        // !!! --- pinNUM
+#define swPin D4        // !!! --- pinNUM
 
 // define output
 #define DATA_LEN 6
@@ -85,9 +85,9 @@ void setup() {
   RTC.adjust(DateTime(__DATE__, __TIME__));
 
   // set input
-  pinMode(clPin, INPUT);
-  pinMode(dtPin, INPUT);
-  pinMode(swPin, INPUT); // del it after all done
+  pinMode(clPin, INPUT_PULLUP);
+  pinMode(dtPin, INPUT_PULLUP);
+  pinMode(swPin, INPUT_PULLUP); // del it after all done
   digitalWrite(swPin, HIGH);
   
   // set output
@@ -95,6 +95,7 @@ void setup() {
   // connect WiFi, Server
   connectToWiFi();
   connectToServer();
+  getWeatherData();
 }
 
 void loop() {
@@ -108,9 +109,11 @@ void loop() {
 //  last_hour = now_hour;
 
   // when input changes, show weather
+  
+  getInput();
   if(now_input != last_input)
   {
-    getInput();
+    getHourIndex();
     showInput();
     showSky();
     showWeather();
@@ -240,13 +243,13 @@ void getInput()
   int change = getEncoderTurn();
   now_input = now_input + change;
   if(digitalRead(swPin) == LOW)
-    now_input = 0;  
-  if(now_input == 0)
-    now_input = 20;
-  else if(now_input>0)
+    now_input = 0; 
+  if(now_input>0)
     now_input = now_input % 20;
   else
-    now_input = now_input % 20 + 20;
+    now_input = now_input % 20 + 20; 
+  if(now_input == 0)
+    now_input = 20;
 }
 
 int getEncoderTurn()
@@ -278,7 +281,8 @@ void getHourIndex() // ~ input hour
 // Output
 void showInput()
 {
-    Serial.println("your input " + now_input);  
+    Serial.println("your input " + String(now_input));  
+    Serial.println("now you see the weather on " + String(now_month) + ("/") + String(now_day + data[hour_index][i_day]) + ", ~" + data[hour_index][i_hour] + " : 00");  
 }
 
 void showTodayHour()
