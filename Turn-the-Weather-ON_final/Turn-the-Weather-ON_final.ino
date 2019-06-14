@@ -32,8 +32,8 @@ IPAddress hostIp;
 
 // Time Data
 RTC_DS1307 RTC;
+int last_hour = -1;
 int now_hour = 0;
-int last_hour = 0;
 int now_minute = 0; // for compile
 int now_month = 0;
 int now_day = 0;
@@ -83,12 +83,17 @@ void setup() {
   // set data
   connectToWiFi();
   connectToServer();
-  parseWeatherData();
+  getWeatherData();
+  getTime();
 }
 
 void loop() {
   // put your main code here, to run repeatedly:
-
+  getTime();
+  if(now_hour == last_hour)
+    Serial.println("now time is "+ String(now_hour) + " : " + String(now_minute));
+  last_hour = now_hour;
+  delay(1000);
 }
 
 
@@ -153,7 +158,15 @@ void connectToServer()
 }
 
 // Data
-void parseWeatherData()
+void getTime()
+{
+    DateTime now = RTC.now(); 
+    int now_hour = now.hour();
+    int now_minute = now.minute(); // for compile
+    int now_month = now.month();
+    int now_day = now.day();
+}
+void getWeatherData()
 {
   if(client.available()){
 //    Serial.println("\n\n--now parsing weather data\n\n");
@@ -173,6 +186,117 @@ void parseWeatherData()
   
           // get datetime
           if (line.indexOf("</tm>")>0)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                                                                   
             datetime = line.substring(line.indexOf("<tm>")+4, line.indexOf("</tm>"));
    
           // get weather info by hour
