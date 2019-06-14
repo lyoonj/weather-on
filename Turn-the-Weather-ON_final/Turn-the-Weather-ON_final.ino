@@ -1,12 +1,13 @@
 #include <ESP8266WiFi.h>
 #include <Adafruit_NeoPixel.h>
+#include <Wire.h>
 #include <RTClib.h>
 
 
 // define input
-#define clPin 0        // !!! --- pinNUM
-#define dtPin 0        // !!! --- pinNUM
-#define swPin 0        // !!! --- pinNUM
+#define clPin 2        // !!! --- pinNUM
+#define dtPin 3        // !!! --- pinNUM
+#define swPin 4        // !!! --- pinNUM
 
 // define output
 #define DATA_LEN 6
@@ -39,8 +40,10 @@ int now_month = 0;
 int now_day = 0;
 
 // Input Data
+static int oldA = HIGH;
+static int oldB = HIGH;
 int now_input = 0;
-int last_input = 0;
+int last_input = -1;
 int hour_index = 0;
 int input_day = 0;
 
@@ -76,24 +79,43 @@ Adafruit_NeoPixel clock_strip = Adafruit_NeoPixel(CLOCK_LEN, CLOCK_PIN, NEO_GRB 
 void setup() {
   Serial.begin(115200);
 
-  // set input
+  // set time
+  Wire.begin();
+  RTC.begin();
+  RTC.adjust(DateTime(__DATE__, __TIME__));
 
+  // set input
+  pinMode(clPin, INPUT);
+  pinMode(dtPin, INPUT);
+  pinMode(swPin, INPUT); // del it after all done
+  digitalWrite(swPin, HIGH);
+  
   // set output
 
-  // set data
+  // connect WiFi, Server
   connectToWiFi();
   connectToServer();
-  getWeatherData();
-  getTime();
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
-  getTime();
-  if(now_hour == last_hour)
-    Serial.println("now time is "+ String(now_hour) + " : " + String(now_minute));
-  last_hour = now_hour;
-  delay(1000);
+  // when hour changes, get weather
+//  getTime();
+//  if(now_hour != last_hour)
+//  {
+//    showTodayHour();
+//    getWeatherData();
+//  }
+//  last_hour = now_hour;
+
+  // when input changes, show weather
+  if(now_input != last_input)
+  {
+    getInput();
+    showInput();
+    showSky();
+    showWeather();
+  }
+  last_input = now_input;
 }
 
 
@@ -161,11 +183,12 @@ void connectToServer()
 void getTime()
 {
     DateTime now = RTC.now(); 
-    int now_hour = now.hour();
-    int now_minute = now.minute(); // for compile
-    int now_month = now.month();
-    int now_day = now.day();
+    now_hour = now.hour();
+    now_minute = now.minute(); // for compile
+    now_month = now.month();
+    now_day = now.day();
 }
+
 void getWeatherData()
 {
   if(client.available()){
@@ -185,118 +208,7 @@ void getWeatherData()
 //          Serial.println("" + line + "\n");
   
           // get datetime
-          if (line.indexOf("</tm>")>0)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-                                                                   
+          if (line.indexOf("</tm>")>0)                                                      
             datetime = line.substring(line.indexOf("<tm>")+4, line.indexOf("</tm>"));
    
           // get weather info by hour
@@ -323,13 +235,40 @@ void getWeatherData()
 
 
 // Input
-int getHourIndex(int input_hour) // 18 : (15 ~ 18을 의미. 즉, 16이면 18에 들어가야 함.)
+void getInput()
+{
+  int change = getEncoderTurn();
+  now_input = now_input + change;
+  if(digitalRead(swPin) == LOW)
+    now_input = 0;  
+  if(now_input == 0)
+    now_input = 20;
+  else if(now_input>0)
+    now_input = now_input % 20;
+  else
+    now_input = now_input % 20 + 20;
+}
+
+int getEncoderTurn()
+{
+  int result = 0;
+  int newA = digitalRead(clPin);
+  int newB = digitalRead(dtPin);
+  if(newA != oldA || newB != oldB)
+    if(oldA == HIGH && newA == LOW)
+      result = (oldB * 2 - 1);
+  oldA = newA;
+  oldB = newB;
+  return result;  
+}
+
+void getHourIndex() // ~ input hour
 {
       int i = 0;
-      int hour_area = input_hour - (input_hour % 3) + 3;
+      int hour_area = now_input - (now_input % 3) + 3;
       for(int i=0; i<8; i++)
-        if(data[i][i_hour].toInt() == hour_area) return i;
-      return -1;
+        if(data[i][i_hour].toInt() == hour_area) 
+          hour_index = i;
 }
 
 
@@ -337,19 +276,31 @@ int getHourIndex(int input_hour) // 18 : (15 ~ 18을 의미. 즉, 16이면 18에
 
 
 // Output
+void showInput()
+{
+    Serial.println("your input " + now_input);  
+}
+
 void showTodayHour()
 {
   Serial.println("Today hour is " + String(now_hour) + " :00 ~ 24:00");
 }
 
-void colorOn()
+void LightOn()
+{
+  
+}
+
+void LightOff()
 {
   
 }
 
 void showWeather()
 {
-  
+    Serial.println("\n--- The weather of ~" + String(hour_index*3) + " : 00");
+    Serial.println(data[hour_index][i_sky]);
+    Serial.println(data[hour_index][i_pty]);
 }
 
 void showSky()
