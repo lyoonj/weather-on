@@ -35,7 +35,7 @@ RTC_DS1307 RTC;
 int now_hour = 0;
 int last_hour = 0;
 int now_minute = 0; // for compile
-int now_month = 0;
+int now_month = 0; 
 int now_day = 0;
 
 // Input Data
@@ -84,6 +84,7 @@ void setup() {
   connectToWiFi();
   connectToServer();
   parseWeatherData();
+  printData();
 }
 
 void loop() {
@@ -156,7 +157,7 @@ void connectToServer()
 void parseWeatherData()
 {
   if(client.available()){
-//    Serial.println("\n\n--now parsing weather data\n\n");
+    Serial.println("\n\n--now parsing weather data\n\n");
     int index_now =0;
     int index_count = 0;
     if (client.connected())
@@ -169,7 +170,7 @@ void parseWeatherData()
         {
           // get line
           String line = client.readStringUntil('\n');
-//          Serial.println("" + line + "\n");
+          Serial.println("" + line + "\n");
   
           // get datetime
           if (line.indexOf("</tm>")>0)
@@ -185,7 +186,7 @@ void parseWeatherData()
                 data[index_now][index_count] = line.substring(head, tail);
                 if (index_count==DATA_LEN-1) // 여기다.. 이 조건 안에서 플러스를 해줘야지..
                   index_now++;
-//                Serial.println("\n---- " + line.substring(head, tail) + " is in data [" + String(index_now) + "][" + String(index_count) + "]\n"); // 확인용
+                Serial.println("\n---- " + line.substring(head, tail) + " is in data [" + String(index_now) + "][" + String(index_count) + "]\n"); // 확인용
              }
           }
          }
@@ -194,6 +195,17 @@ void parseWeatherData()
   }
 }
 
+
+void printData()
+{
+    for(int i=0; i<8; i++)
+    {
+      Serial.println("\nhour is : " + String(data[i][i_hour]));
+      Serial.println("sky is : " + String(data[i][i_sky]));
+      Serial.println("pty is : " + String(data[i][i_pty]));
+      Serial.println("temp is : " + String(data[i][i_temp]));
+      }  
+}
 
 
 
