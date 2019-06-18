@@ -5,18 +5,18 @@
 
 
 // define input
-#define clPin D2        // !!! --- pinNUM
-#define dtPin D3        // !!! --- pinNUM
-#define swPin D4        // !!! --- pinNUM
+#define clPin D5        // !!! --- pinNUM
+#define dtPin D4        // !!! --- pinNUM
+#define swPin D3        // !!! --- pinNUM
 
 // define output
 #define DATA_LEN 6
-#define WEATHER_PIN 0  // !!! --- pinNUM
+#define WEATHER_PIN D6  // !!! --- pinNUM
 #define WEATHER_LEN 12
 #define WEATHER_NUM 6
-#define SKY_PIN 0      // !!! --- pinNUM
-#define SKY_LEN 0
-#define CLOCK_PIN 0 
+#define SKY_PIN D7      // !!! --- pinNUM
+#define SKY_LEN 33
+#define CLOCK_PIN D8 
 #define CLOCK_LEN 8    // !!! --- pinNUM
 
 
@@ -57,13 +57,14 @@ String data[8][DATA_LEN] = {{"", "", "", "", "", ""}, {"", "", "", "", "", ""}, 
 // Output
 int output_sky = 0;
 int output_pty = 0;
-Adafruit_NeoPixel weather_strip = Adafruit_NeoPixel(WEATHER_LEN, WEATHER_PIN, NEO_GRB + NEO_KHZ800);
+Adafruit_NeoPixel weather_strip = Adafruit_NeoPixel(WEATHER_LEN * WEATHER_NUM, WEATHER_PIN, NEO_GRB + NEO_KHZ800);
 Adafruit_NeoPixel sky_strip = Adafruit_NeoPixel(SKY_LEN, SKY_PIN, NEO_GRB + NEO_KHZ800);
 Adafruit_NeoPixel clock_strip = Adafruit_NeoPixel(CLOCK_LEN, CLOCK_PIN, NEO_GRB + NEO_KHZ800);
 
 
 
-
+void showSky();
+void showWeather();
 
 
 
@@ -277,7 +278,6 @@ void getHourIndex() // ~ input hour
 
 
 
-
 // Output
 void showInput()
 {
@@ -287,17 +287,29 @@ void showInput()
 
 void showTodayHour()
 {
-  Serial.println("Today hour is " + String(now_hour) + " :00 ~ 24:00");
+    Serial.println("Today hour is " + String(now_hour) + " :00 ~ 24:00");
+    for(uint16_t i = 0; i<=CLOCK_LEN; i++)
+      if(now_hour<=i*3){
+          clock_strip.setPixelColor(i, clock_strip.Color(255, 255, 255));
+      }
+      else{
+          clock_strip.setPixelColor(i, 0);
+      }
 }
 
-void LightOn()
+void weatherOn(int n)
 {
-  
+    for (uint16_t i = (n-1)*WEATHER_LEN; i < n*WEATHER_LEN; i++){
+        weather_strip.setPixelColor(i, weather_strip.Color(255, 255, 255));  
+        weather_strip.show();
+    }
 }
-
-void LightOff()
+void weatherOff(int n)
 {
-  
+    for (uint16_t i = (n-1)*WEATHER_LEN; i < n*WEATHER_LEN; i++){
+        weather_strip.setPixelColor(i, 0);  
+        weather_strip.show();
+    }
 }
 
 void showWeather()
@@ -305,9 +317,53 @@ void showWeather()
     Serial.println("\n--- The weather of ~" + String(hour_index*3) + " : 00");
     Serial.println(data[hour_index][i_sky]);
     Serial.println(data[hour_index][i_pty]);
+
+    // sky
+    // [WEATHER_LEN*0] <= ~ < [WEATHER_LEN*1] / 맑음 : 맑음
+    // [WEATHER_LEN*1] <= ~ < [WEATHER_LEN*2] / 구름 조금 : 맑음, 구름 조금
+    // [WEATHER_LEN*2] <= ~ < [WEATHER_LEN*3] / 구름 많음 : 맑음, 구름 조금, 구름 많음
+    // [WEATHER_LEN*5] <= ~ < [WEATHER_LEN*4] / 흐림 : 구름 조금, 구름 많음, 흐림
+    if(output_sky == 4){
+        for(int i=1; i<=4; i++){
+            if(i==output_sky)
+              weatherOn(i);
+            else
+              weatherOff(i);
+        }
+    }
+    else{
+        for(int i=1; i<=4; i++){
+            if(i<=output_sky)
+              weatherOn(i);
+            else
+              weatherOff(i);
+        }
+    }
+
+    // pty
+    // 비, 눈은 따로! (비 : 1, 눈 : 4)
+    int rain = 5, snow = 6;
+    weatherOff(rain);
+    weatherOff(snow); // 깜빡거리면 그냥 조건 일일히 따지는 방향으로~~
+    if(output_pty == 1 || output_pty == 4){
+      weatherOn(6 - output_pty % 4); // 1 -> 5, 4 -> 6
+    }
+    else if(output_pty == 2 || output_pty == 3) {
+      weatherOn(rain);
+      weatherOn(snow);
+    }
+    // -- 이 코드 맘에 안 들 어 안 들  ㅇ ㅓ   ,  . ...,  , . 근데 이건 전적으로 기상청이 잘못했어... 어
+    // --- 4로 나누면?
+    // 1%4 = 1, 4%4 = 0
+    // 6 - out_pty % 4
+    // 3%4 = 1, 
 }
 
 void showSky()
 {
-  
+  for(uint16_t i=0; i<SKY_LEN; i++)
+  {
+    sky_strip.setPixelColor(i, sky_strip.Color(255, 255, 255));
+    sky_strip.show();  
+  }
 }
